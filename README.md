@@ -39,3 +39,17 @@ Berikut potongan kode inisialisasi pada `src/main.rs` publisher yang menunjukkan
 
 ### RabbitMQ Interface
 ![RabbitMQ Interface](assets/images/RabbitMQ-Interface.png)
+
+### RabbitMQ Connection
+![RabbitMQ Connection](assets/images/RabbitMQ-Connection.png)
+![5 Message Events](assets/images/5MessageEvent.png)
+
+Setelah menjalankan baik program publisher maupun subscriber, kita dapat melihat adanya koneksi aktif pada antarmuka manajemen RabbitMQ. Hal ini menunjukkan bahwa program-program tersebut telah berhasil terhubung ke message broker dan siap untuk melakukan pertukaran data.
+
+Ketika program publisher dijalankan dengan `cargo run`, ia akan mengirimkan 5 pesan event ke message broker. Pesan-pesan ini kemudian akan segera dikonsumsi dan diproses oleh subscriber yang sedang aktif mendengarkan pada antrean yang sama.
+
+### RabbitMQ Monitoring
+![RabbitMQ Monitoring](assets/images/RabbitMQ-SubscriberConnection.png)
+![5 Message Events Spike](assets/images/5MessageEventSpike.png)
+
+Grafik monitoring pada RabbitMQ menunjukkan adanya lonjakan (*spike*) ketika program publisher dijalankan. Lonjakan ini merepresentasikan aktivitas pengiriman pesan dari publisher ke message broker secara cepat (5 pesan sekaligus). Setelah pesan-pesan tersebut berhasil diterima dan masuk ke dalam antrean, grafik akan menunjukkan aktivitas konsumsi oleh subscriber yang sedang berjalan, membuktikan adanya aliran data yang sukses antara kedua layanan tersebut.
