@@ -1,5 +1,7 @@
 # Tutorial 9 - Publisher
 
+***By Christna Yosua Rotinsulu - 2406495691***
+
 ### 1. Seberapa banyak data yang dikirimkan oleh program publisher ke message broker dalam satu kali *run*?
 
 Dalam satu kali eksekusi (satu *run*), program publisher saya mengirimkan **5 buah data (pesan)** ke message broker. 
@@ -34,3 +36,6 @@ Berikut potongan kode inisialisasi pada `src/main.rs` publisher yang menunjukkan
 ```rust
     let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@localhost:5672".to_owned()).unwrap();
 ```
+
+### RabbitMQ Interface
+![RabbitMQ Interface](assets/images/RabbitMQ-Interface.png)
