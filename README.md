@@ -53,3 +53,9 @@ Ketika program publisher dijalankan dengan `cargo run`, ia akan mengirimkan 5 pe
 ![5 Message Events Spike](assets/images/5MessageEventSpike.png)
 
 Grafik monitoring pada RabbitMQ menunjukkan adanya lonjakan (*spike*) ketika program publisher dijalankan. Lonjakan ini merepresentasikan aktivitas pengiriman pesan dari publisher ke message broker secara cepat (5 pesan sekaligus). Setelah pesan-pesan tersebut berhasil diterima dan masuk ke dalam antrean, grafik akan menunjukkan aktivitas konsumsi oleh subscriber yang sedang berjalan, membuktikan adanya aliran data yang sukses antara kedua layanan tersebut.
+
+### Simulation Slow Subscriber
+![Console Connection Sleep](assets/images/ConsoleConnectionSleep.png)
+![RabbitMQ Connection Sleep](assets/images/RabbitMQ-ConnectionSleep.png)
+
+You will see something like this. It means the producer can just keep sending requests, and those requests (as an event) are put on a queue message. Slowly the consumer will process it one by one.
