@@ -127,6 +127,43 @@ Saya juga memverifikasi koneksi tersebut melalui *dashboard* RabbitMQ Management
 
 Hal ini membuktikan bahwa arsitektur pengiriman pesan asinkronus ini dapat berjalan dengan baik di lingkungan *cloud* asalkan konfigurasi jaringan dan *firewall* sudah tepat.
 
+### Monitoring Spike di EC2
+
+Selain memverifikasi koneksi, saya juga memantau grafik aktivitas pada *dashboard* RabbitMQ saat program *publisher* dijalankan. Terjadi sebuah lonjakan tajam (*spike*) pada grafik *Message Rate* sesaat setelah saya mengeksekusi perintah `cargo run` pada *publisher* di terminal lokal saya.
+
+![RabbitMQ Spike EC2](assets/images/RabbitMQ-Spike-EC2.png)
+
+Lonjakan ini memiliki kaitan erat dengan bagaimana program *publisher* saya bekerja. Di dalam `main.rs`, saya memerintahkan program untuk mengirimkan 5 buah pesan *event* secara berturut-turut tanpa jeda waktu. Berikut adalah potongan kode pemicunya:
+
+```rust
+// publisher/src/main.rs
+
+    _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
+        user_id: "1".to_owned(), user_name: "2406495691-Amir".to_owned() });
+    _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
+        user_id: "2".to_owned(), user_name: "2406495691-Budi".to_owned() });
+    _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
+        user_id: "3".to_owned(), user_name: "2406495691-Cica".to_owned() });
+    _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
+        user_id: "4".to_owned(), user_name: "2406495691-Dira".to_owned() });
+    _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
+        user_id: "5".to_owned(), user_name: "2406495691-Emir".to_owned() });
+```
+
+Karena pesan-pesan tersebut dikirimkan hampir secara instan ke RabbitMQ yang ada di EC2, sistem *monitoring* mencatat adanya beban kerja yang masuk secara tiba-tiba dalam satu waktu. Jika *subscriber* sedang sibuk atau memiliki waktu pemrosesan (seperti yang saya simulasikan dengan `thread::sleep` di bawah), maka pesan-pesan ini akan menumpuk sebentar di antrean, menciptakan *spike* yang terlihat jelas pada grafik.
+
+```rust
+// subscriber/src/main.rs
+
+    fn handle(&self, message: Box<UserCreatedEventMessage>) -> Result<(), HandleError> {
+        let ten_millis = time::Duration::from_millis(1000); // Simulasi pemrosesan lambat
+        thread::sleep(ten_millis);
+
+        println!("In Christna Yosua Rotinsulu's Computer [2406495691]. Message received: {:?}", message);
+        Ok(())
+    }
+```
+
 ### Referensi
 RabbitMQ. (n.d.-a). *Dead letter exchanges*. Retrieved May 12, 2026, from https://www.rabbitmq.com/docs/dlx
 
