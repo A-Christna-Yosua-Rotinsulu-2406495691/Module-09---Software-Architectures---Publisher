@@ -34,7 +34,7 @@ impl MessageHandler<UserCreatedEventMessage> for UserCreatedHandler {
 }
 
 fn main() {
-    let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@localhost:5672".to_owned()).unwrap();
+    let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@54.208.122.143:5672".to_owned()).unwrap();
     
     // Saya mengirim 5 pesan event "user_created" ke dalam message broker secara berurutan
     _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
@@ -58,7 +58,7 @@ Kesamaan URL antara program **publisher** dan **subscriber** ini berarti **kedua
 
 Berikut potongan kode inisialisasi pada `src/main.rs` publisher yang menunjukkan penggunaan URL koneksi tersebut:
 ```rust
-    let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@localhost:5672".to_owned()).unwrap();
+    let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@54.208.122.143:5672".to_owned()).unwrap();
 ```
 
 ### RabbitMQ Interface
@@ -109,7 +109,23 @@ Berdasarkan kode yang ada sekarang, beberapa hal yang dapat ditingkatkan antara 
    - Di `main.rs` subscriber, terdapat `loop {}` yang kosong. Ini adalah *busy-wait* yang mengonsumsi CPU secara sia-sia. Sebaiknya gunakan mekanisme sinkronisasi yang lebih baik atau biarkan main thread menunggu sinyal berhenti secara elegan.
 
 4. **Konfigurasi Eksternal**:
-   - URL koneksi `"amqp://guest:guest@localhost:5672"` saat ini di-*hardcode*. Sebaiknya dipindahkan ke variabel lingkungan (*environment variables*) atau file konfigurasi agar lebih fleksibel saat *deployment*.
+    - URL koneksi `"amqp://guest:guest@54.208.122.143:5672"` saat ini di-*hardcode*. Sebaiknya dipindahkan ke variabel lingkungan (*environment variables*) atau file konfigurasi agar lebih fleksibel saat *deployment*.
+
+## Bonus: Running on Cloud (AWS EC2)
+
+### Make it Works
+
+Setelah berhasil menjalankan RabbitMQ di lokal, saya mencoba memindahkannya ke *cloud* menggunakan AWS EC2. Saya mengonfigurasi *Security Group* pada EC2 untuk membuka port 5672 (AMQP) dan 15672 (Management UI) agar dapat diakses secara eksternal.
+
+Berikut adalah tampilan konsol saat saya menjalankan program *subscriber* dan *publisher* yang terhubung ke IP publik EC2 saya:
+
+![Console Make It Work EC2](assets/images/ConsoleMakeItWork-EC2.png)
+
+Saya juga memverifikasi koneksi tersebut melalui *dashboard* RabbitMQ Management yang berjalan di EC2. Terlihat bahwa terdapat koneksi aktif yang masuk dari komputer saya menuju *server* di AWS:
+
+![RabbitMQ Make It Work EC2](assets/images/RabbitMQ-MakeItWork-EC2.png)
+
+Hal ini membuktikan bahwa arsitektur pengiriman pesan asinkronus ini dapat berjalan dengan baik di lingkungan *cloud* asalkan konfigurasi jaringan dan *firewall* sudah tepat.
 
 ### Referensi
 RabbitMQ. (n.d.-a). *Dead letter exchanges*. Retrieved May 12, 2026, from https://www.rabbitmq.com/docs/dlx
