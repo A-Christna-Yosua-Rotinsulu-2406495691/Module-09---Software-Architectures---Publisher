@@ -191,6 +191,41 @@ Angka 20 pada antrean tersebut merupakan hasil akumulasi dari pesan-pesan yang s
 
 Hal ini membuktikan bahwa RabbitMQ di AWS EC2 berfungsi dengan sangat baik sebagai *buffer* penengah, memastikan tidak ada pesan yang hilang meskipun *subscriber* saya sedang berjalan sangat lambat.
 
+### Reflection: Running Multiple Subscribers
+
+Pada percobaan selanjutnya, saya mencoba menjalankan lebih dari satu *subscriber* secara bersamaan (setidaknya 3 *subscriber*) untuk menangani antrean pesan yang dikirim oleh *publisher*.
+
+![Console Slow Connection Multiple Subscribers](assets/images/ConsoleSlowConnection2Subscriber.png)
+
+![RabbitMQ Slow Connection Multiple Subscribers](assets/images/RabbitMQ-SlowConnection2Subcriber-EC2.png)
+
+**Mengapa lonjakan antrean (*spike*) berkurang lebih cepat daripada sebelumnya?**
+
+Saya mengamati bahwa ketika jumlah *subscriber* ditambah, antrean pesan di RabbitMQ berkurang jauh lebih cepat. Hal ini terjadi karena RabbitMQ mendistribusikan pesan secara **Round Robin** kepada semua *subscriber* yang aktif. 
+
+Meskipun di dalam kode `subscriber/src/main.rs` saya tetap memasang jeda 1 detik:
+```rust
+// subscriber/src/main.rs
+    let ten_millis = time::Duration::from_millis(1000);
+    thread::sleep(ten_millis);
+```
+Namun, karena ada 3 *subscriber* yang bekerja secara paralel, maka dalam satu detik kita bisa menyelesaikan 3 pesan sekaligus (setiap *subscriber* mengambil 1 pesan). Inilah alasan mengapa grafik antrean turun lebih curam dan beban kerja selesai lebih cepat dibandingkan saat hanya ada satu *subscriber*.
+
+**Hal apa yang bisa ditingkatkan dari kode Publisher dan Subscriber?**
+
+Setelah meninjau kembali kode pada `publisher/src/main.rs` dan `subscriber/src/main.rs`, saya melihat beberapa peluang peningkatan:
+
+1. **Pemisahan Konfigurasi**: Saat ini saya masih melakukan *hardcode* pada URL koneksi di fungsi `main`.
+   ```rust
+   // publisher/src/main.rs
+   let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@54.208.122.143:5672".to_owned()).unwrap();
+   ```
+   Akan lebih baik jika saya menggunakan *environment variables* (file `.env`) sehingga IP server bisa diganti tanpa harus menyentuh kode program.
+
+2. **Error Handling & Resiliency**: Kode saat ini banyak menggunakan `.unwrap()`. Di lingkungan *cloud* seperti AWS, koneksi bisa saja tidak stabil. Saya sebaiknya menggunakan penanganan error yang lebih kuat agar program tidak langsung mati (*panic*) jika terjadi gangguan koneksi sesaat, melainkan mencoba melakukan koneksi ulang (*reconnect*).
+
+3. **Konkurensi Internal**: Daripada membuka banyak terminal untuk menjalankan banyak instansi *subscriber*, saya bisa memodifikasi kode *subscriber* agar menggunakan *thread pool* di dalamnya. Dengan begitu, satu program *subscriber* dapat memproses banyak pesan secara konkuren sekaligus secara internal.
+
 ### Referensi
 RabbitMQ. (n.d.-a). *Dead letter exchanges*. Retrieved May 12, 2026, from https://www.rabbitmq.com/docs/dlx
 
