@@ -164,6 +164,33 @@ Karena pesan-pesan tersebut dikirimkan hampir secara instan ke RabbitMQ yang ada
     }
 ```
 
+### Simulation Slow Subscriber di EC2
+
+Eksperimen terakhir yang saya lakukan di cloud adalah mensimulasikan *slow subscriber*. Saya sengaja membuat *subscriber* memproses pesan lebih lambat daripada kecepatan *publisher* mengirimkan data untuk melihat bagaimana RabbitMQ menangani penumpukan beban.
+
+![RabbitMQ Slow Connection EC2](assets/images/RabbitMQ_SlowConnection-EC2.png)
+
+**Mengapa jumlah pesan dalam antrean bisa mencapai angka tertentu (dalam percobaan saya mencapai 20)?**
+
+Angka 20 pada antrean tersebut merupakan hasil akumulasi dari pesan-pesan yang sudah dikirim oleh *publisher* namun belum sempat diproses oleh *subscriber*. Penjelasannya adalah sebagai berikut:
+
+1. **Sisi Publisher**: Setiap kali saya menjalankan perintah `cargo run` pada project *publisher*, program tersebut akan mengirimkan **5 buah pesan** sekaligus ke RabbitMQ.
+   ```rust
+   // publisher/src/main.rs
+   _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage { ... }); // Dipanggil 5 kali
+   ```
+
+2. **Sisi Subscriber**: Saya memodifikasi *subscriber* agar bekerja sangat lambat dengan menambahkan `thread::sleep` selama 1 detik (1000 ms) untuk setiap pesan yang diterima.
+   ```rust
+   // subscriber/src/main.rs
+   let ten_millis = time::Duration::from_millis(1000);
+   thread::sleep(ten_millis);
+   ```
+
+3. **Akumulasi**: Ketika saya menjalankan program *publisher* sebanyak **4 kali berturut-turut** (4 kali run x 5 pesan = 20 pesan), pesan-pesan tersebut masuk ke RabbitMQ dalam waktu yang sangat singkat. Karena *subscriber* membutuhkan waktu total 20 detik untuk menyelesaikan semuanya, maka pesan-pesan yang mengantre tersebut akan terlihat menumpuk di dashboard RabbitMQ hingga mencapai angka 20.
+
+Hal ini membuktikan bahwa RabbitMQ di AWS EC2 berfungsi dengan sangat baik sebagai *buffer* penengah, memastikan tidak ada pesan yang hilang meskipun *subscriber* saya sedang berjalan sangat lambat.
+
 ### Referensi
 RabbitMQ. (n.d.-a). *Dead letter exchanges*. Retrieved May 12, 2026, from https://www.rabbitmq.com/docs/dlx
 
