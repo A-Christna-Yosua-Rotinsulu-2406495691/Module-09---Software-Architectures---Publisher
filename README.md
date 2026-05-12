@@ -4,15 +4,39 @@
 
 ### 1. Seberapa banyak data yang dikirimkan oleh program publisher ke message broker dalam satu kali *run*?
 
-Dalam satu kali eksekusi (satu *run*), program publisher saya mengirimkan **5 buah data (pesan)** ke message broker. 
+Dalam satu kali eksekusi program (satu *run*), program *publisher* yang saya jalankan mengirimkan **5 buah data (pesan)** ke *message broker*. 
 
-Hal ini dapat dilihat pada berkas `src/main.rs`, di mana saya memanggil metode `publish_event` sebanyak 5 kali secara berurutan untuk mengirimkan 5 objek `UserCreatedEventMessage` yang berbeda (dengan `user_id` dari "1" sampai "5"). Berikut adalah potongan kode yang menunjukkan pengiriman 5 pesan tersebut:
+Hal ini bisa dilihat pada berkas `src/main.rs`, di mana saya secara eksplisit memanggil metode `publish_event` sebanyak 5 kali secara berurutan. Pesan yang saya kirimkan berupa *event* bertipe `UserCreatedEventMessage` dengan identitas `user_id` yang berbeda-beda, mulai dari "1" hingga "5". 
+
+Untuk menambah keterjelasan, berikut adalah keseluruhan isi kode dari `src/main.rs` yang saya buat untuk memfasilitasi pembuatan hingga pengiriman pesan tersebut:
 
 ```rust
+use borsh::{BorshDeserialize, BorshSerialize};
+use crosstown_bus::{CrosstownBus, MessageHandler, HandleError};
+
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize)]
+pub struct UserCreatedEventMessage {
+    pub user_id: String,
+    pub user_name: String
+}
+
+pub struct UserCreatedHandler;
+
+impl MessageHandler<UserCreatedEventMessage> for UserCreatedHandler {
+    fn handle(&self, message: Box<UserCreatedEventMessage>) -> Result<(), HandleError> {
+        println!("Message received on handler 1: {:?}", message);
+        Ok(())
+    }
+
+    fn get_handler_action(&self) -> String {
+        "user_created".to_string()
+    }
+}
+
 fn main() {
     let mut p = CrosstownBus::new_queue_publisher("amqp://guest:guest@localhost:5672".to_owned()).unwrap();
     
-    // Mengirim 5 pesan event "user_created" secara berurutan
+    // Saya mengirim 5 pesan event "user_created" ke dalam message broker secara berurutan
     _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
         user_id: "1".to_owned(), user_name: "2406495691-Amir".to_owned() });
     _ = p.publish_event("user_created".to_owned(), UserCreatedEventMessage {
@@ -28,9 +52,9 @@ fn main() {
 
 ### 2. URL `"amqp://guest:guest@localhost:5672"` sama dengan yang ada di program subscriber, apa artinya?
 
-URL `"amqp://guest:guest@localhost:5672"` adalah alamat koneksi (*connection string*) menuju server RabbitMQ (message broker) yang berjalan di lokal komputer saya (`localhost`) pada *port* standar protokol AMQP yaitu `5672`. Bagian `guest:guest` merupakan *username* dan *password* bawaan (*default*) untuk mengakses instance RabbitMQ tersebut.
+URL `"amqp://guest:guest@localhost:5672"` adalah alamat koneksi (*connection string*) menuju *server* RabbitMQ (*message broker*) yang berjalan di lokal komputer saya (`localhost`) pada *port* standar protokol AMQP yaitu `5672`. Bagian `guest:guest` merupakan *username* dan sandi bawaan (*default*) untuk mengakses *instance* RabbitMQ tersebut.
 
-Kesamaan URL antara program **publisher** dan **subscriber** ini berarti **kedua program tersebut terhubung ke _instance_ message broker (RabbitMQ) yang persis sama**. Hal ini sangat penting agar proses pertukaran pesan dapat terjadi. Karena mereka berdua menunjuk dan terhubung ke tempat yang sama, maka pesan-pesan yang dikirim (dipublikasikan) oleh program publisher ke message broker nantinya dapat dibaca dan diterima dengan baik oleh program subscriber yang "mendengarkan" (*listen* / *subscribe*) pada antrean (*queue*) di message broker tersebut.
+Kesamaan URL antara program **publisher** dan **subscriber** ini berarti **kedua program saya terhubung ke *instance message broker* (RabbitMQ) yang persis sama**. Hal ini sangat krusial agar proses pertukaran pesan antarlayanan dapat terjadi. Karena kedua program menunjuk pada antrean yang sama, pesan yang saya publikasikan oleh program *publisher* ke *message broker* pasti dapat disalurkan dan dibaca dengan tepat oleh *subscriber* yang sedang mendengarkan (*subscribe*).
 
 Berikut potongan kode inisialisasi pada `src/main.rs` publisher yang menunjukkan penggunaan URL koneksi tersebut:
 ```rust
@@ -44,18 +68,50 @@ Berikut potongan kode inisialisasi pada `src/main.rs` publisher yang menunjukkan
 ![RabbitMQ Connection](assets/images/RabbitMQ-Connection.png)
 ![5 Message Events](assets/images/5MessageEvent.png)
 
-Setelah menjalankan baik program publisher maupun subscriber, kita dapat melihat adanya koneksi aktif pada antarmuka manajemen RabbitMQ. Hal ini menunjukkan bahwa program-program tersebut telah berhasil terhubung ke message broker dan siap untuk melakukan pertukaran data.
+Setelah saya menjalankan baik program *publisher* maupun *subscriber*, saya bisa langsung melihat adanya koneksi yang aktif pada antarmuka manajemen RabbitMQ. Hal ini memverifikasi bahwa program-program tersebut telah berhasil terhubung ke *message broker* tanpa kendala dan siap untuk melakukan pertukaran data.
 
-Ketika program publisher dijalankan dengan `cargo run`, ia akan mengirimkan 5 pesan event ke message broker. Pesan-pesan ini kemudian akan segera dikonsumsi dan diproses oleh subscriber yang sedang aktif mendengarkan pada antrean yang sama.
+Saat saya mengeksekusi program *publisher* melalui perintah `cargo run`, program tersebut dengan instan akan mengirimkan 5 pesan *event* berturut-turut ke *message broker*. Karena terhubung dalam alamat selaras, rentetan pesan ini otomatis dikonsumsi dan diproses oleh *subscriber* yang telah berjaga (*listening*) pada sisi antrean yang sama.
 
 ### RabbitMQ Monitoring
 ![RabbitMQ Monitoring](assets/images/RabbitMQ-SubscriberConnection.png)
 ![5 Message Events Spike](assets/images/5MessageEventSpike.png)
 
-Grafik monitoring pada RabbitMQ menunjukkan adanya lonjakan (*spike*) ketika program publisher dijalankan. Lonjakan ini merepresentasikan aktivitas pengiriman pesan dari publisher ke message broker secara cepat (5 pesan sekaligus). Setelah pesan-pesan tersebut berhasil diterima dan masuk ke dalam antrean, grafik akan menunjukkan aktivitas konsumsi oleh subscriber yang sedang berjalan, membuktikan adanya aliran data yang sukses antara kedua layanan tersebut.
+Grafik *monitoring* pada RabbitMQ menunjukkan kemunculan garis lonjakan tajam (*spike*) seketika program *publisher* dieksekusi. Lonjakan ini merepresentasikan aktivitas masuknya beban pengiriman pesan dari *publisher* ke *message broker* dalam waktu yang amat singkat (5 pesan serentak). Setelah lonjakan itu tertampung di dalam antrean, grafik beralih menunjukkan aktivitas pemrosesan secara bertahap oleh *subscriber* yang aktif, sehingga jelas membuktikan berhasilnya mekanisme aliran pesan asinkronus antara dua program saya.
 
 ### Simulation Slow Subscriber
 ![Console Connection Sleep](assets/images/ConsoleConnectionSleep.png)
 ![RabbitMQ Connection Sleep](assets/images/RabbitMQ-ConnectionSleep.png)
 
-You will see something like this. It means the producer can just keep sending requests, and those requests (as an event) are put on a queue message. Slowly the consumer will process it one by one.
+Pada gambar percobaan simulasi di atas, dapat dicermati bahwa *producer* (program *publisher* saya) dapat terus-menerus menembakkan data tanpa henti ke dalam tumpukan antrean pesan. Selanjutnya secara perlahan dari batas memori RabbitMQ, program *consumer* (*subscriber*) saya menarik dan mengolah pekerjaan tersebut satu per satu.
+
+## Simulation Spike Reduce
+
+![Console Spike Reduce](assets/images/ConsoleSpikeReduce.png)
+![RabbitMQ Spike Reduce](assets/images/RabbitMQ-SpikeReduce.png)
+
+### Refleksi/Jawaban
+Pola ini menunjukkan bagaimana *message broker* (RabbitMQ) berfungsi sebagai **buffer** untuk menangani **spike** (lonjakan pesan tiba-tiba). Meskipun publisher mengirimkan banyak pesan dalam waktu yang sangat singkat (seperti terlihat pada gambar konsol di mana publisher selesai jauh sebelum subscriber), RabbitMQ menampung semua pesan tersebut di dalam antrean. 
+
+Subscriber kemudian memproses pesan-pesan tersebut secara stabil satu per satu (karena ada *delay* buatan). Hal ini mencegah subscriber menjadi *overloaded* atau *crash* akibat lonjakan beban mendadak. Inilah yang disebut sebagai strategi **Load Leveling** atau **Spike Arresting**.
+
+### Apa yang bisa ditingkatkan? (Improvements)
+
+Berdasarkan kode yang ada sekarang, beberapa hal yang dapat ditingkatkan antara lain:
+
+1. **Error Handling pada Publisher & Subscriber**:
+   - Di `publisher`, pemanggilan `publish_event` menggunakan `_ =` yang berarti mengabaikan hasil (Result). Sebaiknya ada pengecekan apakah pesan berhasil terkirim ke broker atau tidak.
+   - Di `subscriber`, jika proses pengolahan pesan gagal, kita bisa menambahkan logika *retry* atau memindahkan pesan ke *Dead Letter Exchange* (DLX) untuk dianalisis lebih lanjut.
+
+2. **Concurrency pada Subscriber**:
+   - Saat ini subscriber memproses pesan satu per satu secara sekuensial. Jika volume pesan sangat besar, kita bisa meningkatkan performa dengan menjalankan beberapa *worker threads* untuk memproses pesan secara paralel, namun tetap dengan batas tertentu (*rate limiting*) agar tidak membebani sistem.
+
+3. **Menghindari Busy Loop**:
+   - Di `main.rs` subscriber, terdapat `loop {}` yang kosong. Ini adalah *busy-wait* yang mengonsumsi CPU secara sia-sia. Sebaiknya gunakan mekanisme sinkronisasi yang lebih baik atau biarkan main thread menunggu sinyal berhenti secara elegan.
+
+4. **Konfigurasi Eksternal**:
+   - URL koneksi `"amqp://guest:guest@localhost:5672"` saat ini di-*hardcode*. Sebaiknya dipindahkan ke variabel lingkungan (*environment variables*) atau file konfigurasi agar lebih fleksibel saat *deployment*.
+
+### Referensi
+RabbitMQ. (n.d.-a). *Dead letter exchanges*. Retrieved May 12, 2026, from https://www.rabbitmq.com/docs/dlx
+
+RabbitMQ. (n.d.-b). *RabbitMQ tutorial - Publish/Subscribe*. Retrieved May 12, 2026, from https://www.rabbitmq.com/tutorials/tutorial-three-python
